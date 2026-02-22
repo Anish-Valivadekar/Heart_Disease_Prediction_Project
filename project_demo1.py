@@ -1,122 +1,179 @@
 
-#                              Project Title : Heart Disease Diagnostic Analysis
+# Project: Heart Disease Risk Prediction
 
-#stpe1 : import lib
+# 1. Import Libraries
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
+
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import (accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve)
+
+import warnings
+warnings.filterwarnings("ignore")
 
 
-# Step 2: Load the Dataset
+# 2. Load Dataset
 
-data = pd.read_csv(r"C:\Users\ANISH\Downloads\Heart Disease data.csv")
+data = pd.read_csv("/content/Heart Disease data.csv")
+data.head()
 
-# Display the first few rows
-print(data.head())
-print(data.shape)                                                            #get the dimention of the dataframe
-print(data.index)                                                            #get the row no. of dataframe
-print(data.columns)                                                          #get colums of dataframe
-print(data.info())                                                           #Look at the basic information about the dataframe
+print("Dataset Shape:", data.shape)
+print("\nMissing Values:\n", data.isnull().sum())
+print("\nData Info:\n")
+print(data.info())
 
 
-# Step 3: Exploratory Data Analysis (EDA)
-#Perform data analysis to understand the relationships between different features.
-# Check for missing values
-print(data.isnull().sum())
+# 3. Exploratory Data Analysis
 
-# Statistical summary
-print(data.describe())
 
-# Correlation heatmap
-plt.figure(figsize=(10, 8))
+# Statistical Summary
+print("\nStatistical Summary:\n", data.describe())
+
+# Class Distribution
+sns.countplot(x='target', data=data)
+plt.title("Target Distribution (0 = No Disease, 1 = Disease)")
+plt.show()
+
+# Correlation Heatmap
+plt.figure(figsize=(12,8))
 sns.heatmap(data.corr(), annot=True, cmap='coolwarm')
+plt.title("Correlation Heatmap")
 plt.show()
 
-# Step 4: Data Preprocessing
 
-'''1.Splitting the Data*: Divide the dataset into features (X) and target (y).
-2. Train-Test Split*: Split the data into training and testing sets (80% train, 20% test).
-3. Feature Scaling*: Normalize the feature values for better performance of algorithms.'''
+# 4. Data Preprocessing
 
 
-# Define features and target variable
-X = data.drop('target', axis=1)
-y = data['target']
+X = data.drop("target", axis=1)
+y = data["target"]
 
-# Split the dataset
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Stratified Split 
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
 
-# Standardize the features
+# Feature Scaling
 scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-# Step 5: Model Training
-# Logistic Regression
-
-# Train Logistic Regression model
-log_reg = LogisticRegression()
-log_reg.fit(X_train, y_train)
-
-# Predict and evaluate
-y_pred_log = log_reg.predict(X_test)
-print("Logistic Regression Accuracy:", accuracy_score(y_test, y_pred_log))
-print(classification_report(y_test, y_pred_log))
-
-# K-Nearest Neighbors (KNN)
-# Train K-Nearest Neighbors model
-knn = KNeighborsClassifier(n_neighbors=5)
-knn.fit(X_train, y_train)
-
-# Predict and evaluate
-y_pred_knn = knn.predict(X_test)
-print("KNN Accuracy:", accuracy_score(y_test, y_pred_knn))
-print(classification_report(y_test, y_pred_knn))
-
-## Random Forest Classifier
-# Train Random Forest model
-rf = RandomForestClassifier(n_estimators=100, random_state=42)
-rf.fit(X_train, y_train)
-
-# Predict and evaluate
-y_pred_rf = rf.predict(X_test)
-print("Random Forest Accuracy:", accuracy_score(y_test, y_pred_rf))
-print(classification_report(y_test, y_pred_rf))
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
 
-# Step 6: Model Evaluation
-#Evaluate model performance using a confusion matrix and accuracy scores for each model.
+# 5. Model Building
 
-# Confusion Matrix for Logistic Regression
-conf_matrix_log = confusion_matrix(y_test, y_pred_log)
-sns.heatmap(conf_matrix_log, annot=True, fmt="d", cmap="Blues")
-plt.title("Logistic Regression Confusion Matrix")
-plt.show()
 
-# Confusion Matrix for KNN
-conf_matrix_knn = confusion_matrix(y_test, y_pred_knn)
-sns.heatmap(conf_matrix_knn, annot=True, fmt="d", cmap="Greens")
-plt.title("KNN Confusion Matrix")
-plt.show()
+models = {
+    "Logistic Regression": LogisticRegression(),
+    "KNN": KNeighborsClassifier(),
+    "Random Forest": RandomForestClassifier(random_state=42)
+}
 
-# Confusion Matrix for Random Forest
-conf_matrix_rf = confusion_matrix(y_test, y_pred_rf)
-sns.heatmap(conf_matrix_rf, annot=True, fmt="d", cmap="Oranges")
+results = {}
+
+for name, model in models.items():
+    model.fit(X_train_scaled, y_train)
+    y_pred = model.predict(X_test_scaled)
+    
+    acc = accuracy_score(y_test, y_pred)
+    results[name] = acc
+    
+    print(f"\n{name} Accuracy: {acc:.4f}")
+    print(classification_report(y_test, y_pred))
+
+
+# 6. Cross Validation 
+
+
+rf = RandomForestClassifier(random_state=42)
+cv_scores = cross_val_score(rf, X_train_scaled, y_train, cv=5)
+
+print("\nRandom Forest Cross-Validation Accuracy:", cv_scores.mean())
+
+
+# 7. Hyperparameter Tuning (GridSearch)
+
+param_grid = {
+    'n_estimators': [100, 200],
+    'max_depth': [None, 10, 20]
+}
+
+grid = GridSearchCV(
+    RandomForestClassifier(random_state=42),
+    param_grid,
+    cv=5
+)
+
+grid.fit(X_train_scaled, y_train)
+
+best_rf = grid.best_estimator_
+
+print("\nBest Parameters:", grid.best_params_)
+
+
+# 8. Final Model Evaluation
+
+y_pred_rf = best_rf.predict(X_test_scaled)
+y_prob_rf = best_rf.predict_proba(X_test_scaled)[:,1]
+
+print("\nFinal Random Forest Accuracy:", accuracy_score(y_test, y_pred_rf))
+print("\nClassification Report:\n", classification_report(y_test, y_pred_rf))
+
+# ROC-AUC Score
+roc_auc = roc_auc_score(y_test, y_prob_rf)
+print("\nROC-AUC Score:", roc_auc)
+
+# Confusion Matrix
+conf_matrix = confusion_matrix(y_test, y_pred_rf)
+
+plt.figure(figsize=(5,4))
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues")
 plt.title("Random Forest Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
 plt.show()
 
-# Step 7: Model Comparison
-#Print the accuracy of each model for comparison.
 
-print("Logistic Regression Accuracy:", accuracy_score(y_test, y_pred_log))
-print("KNN Accuracy:", accuracy_score(y_test, y_pred_knn))
-print("Random Forest Accuracy:", accuracy_score(y_test, y_pred_rf))
+# 9. ROC Curve
 
 
+fpr, tpr, thresholds = roc_curve(y_test, y_prob_rf)
+
+plt.figure()
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
+plt.plot([0,1], [0,1], linestyle="--")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve")
+plt.legend()
+plt.show()
+
+
+# 10. Feature Importance
+
+
+feature_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': best_rf.feature_importances_
+}).sort_values(by='Importance', ascending=False)
+
+print("\nTop Important Features:\n", feature_importance)
+
+plt.figure(figsize=(8,6))
+sns.barplot(x='Importance', y='Feature', data=feature_importance)
+plt.title("Feature Importance")
+plt.show()
+
+
+# 11. Final Model Comparison
+
+print("\nModel Comparison:")
+for model, score in results.items():
+    print(f"{model}: {score:.4f}")
+
+print("\nBest Model Selected: Random Forest (Based on Accuracy & ROC-AUC)")
