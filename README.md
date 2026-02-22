@@ -1,4 +1,4 @@
-Heart Disease Prediction Project
+Heart Disease Prediction Projec
 
 This project uses machine learning to predict the likelihood of heart disease based on various clinical features. By analyzing patient data, this project aims to provide a model that can assist healthcare professionals in identifying high-risk individuals early, allowing for timely interventions.
 
